@@ -81,6 +81,22 @@ describe('useWallet hook', () => {
     expect(result.current.isAvailable).toBe(false);
   });
 
+  it('should treat RingWallet provider as unavailable outside iframe', async () => {
+    Object.defineProperty(window, 'ethereum', {
+      writable: true,
+      value: {
+        ...mockEthereum,
+        isRingWallet: true,
+        isMetaMask: false,
+      },
+    });
+
+    const { result } = renderHook(() => useWallet());
+    expect(result.current.isAvailable).toBe(false);
+
+    await expect(result.current.connect()).rejects.toThrow('Wallet not available');
+  });
+
   it('should check existing connection on mount', async () => {
     mockEthereum.request.mockResolvedValueOnce(['0x1234567890123456789012345678901234567890']);
 
@@ -120,7 +136,7 @@ describe('useWallet hook', () => {
 
     const { result } = renderHook(() => useWallet());
 
-    await expect(result.current.connect()).rejects.toThrow('Please install MetaMask');
+    await expect(result.current.connect()).rejects.toThrow('Wallet not available');
   });
 
   it('should set isConnecting during connection', async () => {

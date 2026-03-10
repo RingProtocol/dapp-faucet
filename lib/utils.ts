@@ -18,5 +18,5 @@ export function formatTime(timestamp: number): string {
   if (diff < 3600000) return `${Math.floor(diff / 60000)} min ago`;
   if (diff < 86400000) return `${Math.floor(diff / 3600000)} hours ago`;
 
-  return date.toLocaleDateString();
+  return date.toLocaleDateString("en-US", { timeZone: "UTC" });
 }

@@ -26,6 +26,28 @@ export function useWallet() {
   const [error, setError] = useState<string | null>(null);
   const listenersSetup = useRef(false);
 
+  const getWalletProvider = useCallback(() => {
+    if (typeof window === "undefined") return null;
+
+    const isInIframe = (() => {
+      try {
+        return window.self !== window.top;
+      } catch {
+        return true;
+      }
+    })();
+
+    const eth = window.ethereum as any;
+    if (eth?.isRingWallet) return isInIframe ? eth : null;
+
+    const ring = (window as any).ringWallet?.provider as any;
+    const href = typeof window.location?.href === "string" ? window.location.href : "";
+    const isProxyUrl = /\/api\/v1\/proxy\?url=/.test(href);
+    if (isInIframe && isProxyUrl && ring?.isRingWallet) return ring;
+
+    return eth ?? null;
+  }, []);
+
   const parseChainId = useCallback((raw: unknown): number => {
     if (typeof raw === "number" && Number.isInteger(raw)) return raw;
     const hex = String(raw);
@@ -70,7 +92,7 @@ export function useWallet() {
     }
   }, [web3, account, getBalance]);
 
-  const getReadProvider = useCallback((chainId: number): Web3 => {
+  const getReadProvider = useCallback((chainId: number, provider: any): Web3 => {
     if (chainId === 1) {
       const rpc = getRpcUrl(chainId);
       if (rpc) return new Web3(rpc);
@@ -79,22 +101,23 @@ export function useWallet() {
       const rpc = getRpcUrl(chainId);
       if (rpc) return new Web3(rpc);
     }
-    return new Web3(window.ethereum!);
+    return new Web3(provider);
   }, []);
 
   const checkExistingConnection = useCallback(async () => {
-    if (typeof window === "undefined" || !window.ethereum) return null;
+    const provider = getWalletProvider();
+    if (!provider) return null;
 
     try {
-      const accounts = await window.ethereum.request({
+      const accounts = await provider.request({
         method: "eth_accounts",
       });
       if (accounts.length > 0) {
-        const rawChainId = await window.ethereum.request({
+        const rawChainId = await provider.request({
           method: "eth_chainId",
         });
         const chainId = parseChainId(rawChainId);
-        const w3 = getReadProvider(chainId);
+        const w3 = getReadProvider(chainId, provider);
         setWeb3(w3);
         setAccount(accounts[0]);
         const bal = await getBalance(accounts[0], w3);
@@ -107,26 +130,27 @@ export function useWallet() {
       console.error("Error checking existing connection:", err);
     }
     return null;
-  }, [getBalance, getNetwork, getReadProvider, parseChainId]);
+  }, [getBalance, getNetwork, getReadProvider, getWalletProvider, parseChainId]);
 
   const connect = useCallback(async () => {
-    if (typeof window === "undefined" || !window.ethereum) {
-      throw new Error("Please install MetaMask or another Web3 wallet!");
+    const provider = getWalletProvider();
+    if (!provider) {
+      throw new Error("Wallet not available. Install a Web3 wallet or open this DApp in RingWallet.");
     }
 
     setIsConnecting(true);
     setError(null);
 
     try {
-      const accounts = await window.ethereum.request({
+      const accounts = await provider.request({
         method: "eth_requestAccounts",
       });
       const acct = accounts[0];
-      const rawChainId = await window.ethereum.request({
+      const rawChainId = await provider.request({
         method: "eth_chainId",
       });
       const chainId = parseChainId(rawChainId);
-      const w3 = getReadProvider(chainId);
+      const w3 = getReadProvider(chainId, provider);
       setWeb3(w3);
       setAccount(acct);
       const bal = await getBalance(acct, w3);
@@ -140,7 +164,7 @@ export function useWallet() {
     } finally {
       setIsConnecting(false);
     }
-  }, [getBalance, getNetwork, getReadProvider, parseChainId]);
+  }, [getBalance, getNetwork, getReadProvider, getWalletProvider, parseChainId]);
 
   const disconnect = useCallback(() => {
     setAccount(null);
@@ -151,7 +175,8 @@ export function useWallet() {
 
   const switchChain = useCallback(
     async (targetChainId: number) => {
-      if (typeof window === "undefined" || !window.ethereum) {
+      const provider = getWalletProvider();
+      if (!provider) {
         throw new Error("Wallet not available");
       }
       const chain = SWITCHABLE_CHAINS.find((c) => c.chainId === targetChainId);
@@ -161,14 +186,14 @@ export function useWallet() {
       setIsSwitchingChain(true);
       setError(null);
       try {
-        await window.ethereum.request({
+        await provider.request({
           method: "wallet_switchEthereumChain",
           params: [{ chainId: chain.hexChainId }],
         });
         window.location.reload();
       } catch (err: any) {
         if (err?.code === 4902 || err?.message?.includes("Unrecognized chain")) {
-          await window.ethereum.request({
+          await provider.request({
             method: "wallet_addEthereumChain",
             params: [
               {
@@ -180,7 +205,7 @@ export function useWallet() {
               },
             ],
           });
-          await window.ethereum.request({
+          await provider.request({
             method: "wallet_switchEthereumChain",
             params: [{ chainId: chain.hexChainId }],
           });
@@ -193,7 +218,7 @@ export function useWallet() {
         setIsSwitchingChain(false);
       }
     },
-    []
+    [getWalletProvider]
   );
 
   const isValidAddress = useCallback(
@@ -208,7 +233,8 @@ export function useWallet() {
 
   const sendTransaction = useCallback(
     async (to: string, amount: string) => {
-      if (typeof window === "undefined" || !window.ethereum || !account) {
+      const provider = getWalletProvider();
+      if (!provider || !account) {
         throw new Error("Wallet not connected");
       }
 
@@ -227,10 +253,10 @@ export function useWallet() {
         gas: GAS_CONFIG.STANDARD_TRANSFER,
       };
 
-      const walletWeb3 = new Web3(window.ethereum);
+      const walletWeb3 = new Web3(provider);
       return await walletWeb3.eth.sendTransaction(tx);
     },
-    [web3, account, isValidAddress]
+    [web3, account, getWalletProvider, isValidAddress]
   );
 
   const getExplorerUrl = useCallback(
@@ -243,7 +269,8 @@ export function useWallet() {
 
   // Setup event listeners
   useEffect(() => {
-    if (typeof window === "undefined" || !window.ethereum || listenersSetup.current) return;
+    const provider = getWalletProvider();
+    if (!provider || listenersSetup.current) return;
 
     listenersSetup.current = true;
 
@@ -260,16 +287,18 @@ export function useWallet() {
       window.location.reload();
     };
 
-    window.ethereum.on("accountsChanged", handleAccountsChanged);
-    window.ethereum.on("chainChanged", handleChainChanged);
+    if (typeof provider.on === "function") {
+      provider.on("accountsChanged", handleAccountsChanged);
+      provider.on("chainChanged", handleChainChanged);
+    }
 
     return () => {
-      if (window.ethereum) {
-        window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
-        window.ethereum.removeListener("chainChanged", handleChainChanged);
+      if (typeof provider.removeListener === "function") {
+        provider.removeListener("accountsChanged", handleAccountsChanged);
+        provider.removeListener("chainChanged", handleChainChanged);
       }
     };
-  }, [disconnect, checkExistingConnection]);
+  }, [disconnect, checkExistingConnection, getWalletProvider]);
 
   // Check existing connection on mount
   useEffect(() => {
@@ -284,7 +313,7 @@ export function useWallet() {
     isConnecting,
     isSwitchingChain,
     error,
-    isAvailable: typeof window !== "undefined" && !!window.ethereum,
+    isAvailable: typeof window !== "undefined" && !!getWalletProvider(),
     isConnected: !!account,
     connect,
     disconnect,

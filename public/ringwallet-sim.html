@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RingWallet Simulator</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <iframe id="dapp" src="/"></iframe>
+    <script>
+      ;(function () {
+        var iframe = document.getElementById("dapp")
+        var chainId = "0x1"
+        var accounts = []
+        var nextId = 1
+        var blockNumber = 12345
+
+        function postToDapp(message) {
+          if (!iframe || !iframe.contentWindow) return
+          iframe.contentWindow.postMessage(message, "*")
+        }
+
+        function respond(id, result, error) {
+          postToDapp({
+            type: "ring_wallet_response",
+            id: id,
+            result: result,
+            error: error || null,
+          })
+        }
+
+        function emit(event, data) {
+          postToDapp({
+            type: "ring_wallet_event",
+            event: event,
+            data: data,
+          })
+        }
+
+        function randomHash() {
+          var hex = ""
+          for (var i = 0; i < 64; i++) hex += Math.floor(Math.random() * 16).toString(16)
+          return "0x" + hex
+        }
+
+        function toHexNumber(n) {
+          return "0x" + Number(n).toString(16)
+        }
+
+        function handleRpc(method, params) {
+          if (method === "eth_chainId") return chainId
+          if (method === "net_version") return String(parseInt(chainId, 16))
+          if (method === "eth_accounts") return accounts.slice()
+          if (method === "eth_requestAccounts") {
+            if (!accounts.length) accounts = ["0x1234567890123456789012345678901234567890"]
+            emit("accountsChanged", accounts.slice())
+            emit("connect", { chainId: chainId })
+            return accounts.slice()
+          }
+
+          if (method === "wallet_switchEthereumChain") {
+            var target = params && params[0] && params[0].chainId
+            if (typeof target === "string" && target.startsWith("0x")) {
+              chainId = target
+              emit("chainChanged", chainId)
+            }
+            return null
+          }
+
+          if (method === "wallet_addEthereumChain") return null
+          if (method === "eth_getBalance") return "0xDE0B6B3A7640000"
+          if (method === "eth_blockNumber") return toHexNumber(blockNumber)
+          if (method === "eth_sendTransaction") return randomHash()
+          if (method === "eth_getTransactionReceipt") {
+            return {
+              transactionHash: (params && params[0]) || randomHash(),
+              status: "0x1",
+              blockNumber: toHexNumber(blockNumber),
+            }
+          }
+
+          var error = {
+            code: 4200,
+            message: "Unsupported method: " + method,
+          }
+          throw error
+        }
+
+        window.addEventListener("message", function (event) {
+          var data = event.data
+          if (!data || typeof data !== "object") return
+
+          if (data.type === "ring_wallet_handshake") {
+            postToDapp({
+              type: "ring_wallet_handshake_ack",
+              chainId: chainId,
+              accounts: accounts.slice(),
+              version: "simulator",
+            })
+            return
+          }
+
+          if (data.type === "ring_wallet_request") {
+            var id = data.id || nextId++
+            try {
+              var result = handleRpc(data.method, data.params || [])
+              respond(id, result, null)
+            } catch (err) {
+              respond(id, null, {
+                code: err && typeof err.code === "number" ? err.code : 4200,
+                message: err && err.message ? err.message : "Request failed",
+                data: err && err.data ? err.data : undefined,
+              })
+            }
+          }
+        })
+      })()
+    </script>
+  </body>
+</html>
+
