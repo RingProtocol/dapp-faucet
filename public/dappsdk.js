@@ -1,6 +1,9 @@
 /**
  * Ring Wallet DApp SDK v1.0.0
  *
+ * Canonical source: this repo public/dappsdk.js (served at /dappsdk.js when deployed).
+ * Code that injects or references this script uses src/server/dappsdk.ts.
+ *
  * Drop this script into any DApp to enable communication with Ring Wallet
  * when loaded inside the wallet's iframe container.
  *
@@ -8,9 +11,7 @@
  *   - EIP-1193 (Ethereum Provider JavaScript API)
  *   - EIP-6963 (Multi Injected Provider Discovery)
  *
- * Usage:
- *   <script src="https://api.walletapp.testring.org/static/dappsdk.js"></script>
- *   or copy this file into your project and include it before your app bundle.
+ * Usage: see docs/dev_delivers/dapp-integration.md (self-host this file or load from wallet host).
  */
 ;(function () {
   'use strict'
@@ -328,13 +329,24 @@
   // ────────────────────────────────────────────────────
   //  Inject as window.ethereum (legacy compatibility)
   // ────────────────────────────────────────────────────
+  //
+  // When running inside Ring Wallet's iframe, always override window.ethereum
+  // even if MetaMask extension already injected its provider into this frame.
+  // When loaded as a standalone page (no iframe), only inject if no other wallet
+  // is present so we don't conflict with MetaMask in the user's main browser.
 
-  if (typeof window.ethereum === 'undefined') {
-    Object.defineProperty(window, 'ethereum', {
-      value: provider,
-      writable: false,
-      configurable: true
-    })
+  if (isInIframe || typeof window.ethereum === 'undefined') {
+    try {
+      Object.defineProperty(window, 'ethereum', {
+        value: provider,
+        writable: false,
+        configurable: true
+      })
+    } catch (_e1) {
+      // MetaMask (some versions) sets the property as non-configurable.
+      // Fall back to direct assignment so Ring Wallet still wins inside the iframe.
+      try { window.ethereum = provider } catch (_e2) {}
+    }
   }
 
   // ────────────────────────────────────────────────────
@@ -371,15 +383,6 @@
   // Also announce on DOMContentLoaded in case the event loop hasn't reached DApp code yet
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', announceProvider)
-  }
-
-  // ────────────────────────────────────────────────────
-  //  Public API on window
-  // ────────────────────────────────────────────────────
-
-  window.ringWallet = {
-    provider: provider,
-    version: '1.0.0'
   }
 
   console.log('[Ring Wallet] DApp SDK v1.0.0 initialized' + (isInIframe ? ' (iframe mode)' : ''))

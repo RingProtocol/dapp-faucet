@@ -112,7 +112,10 @@ The SDK uses two standard Ethereum interfaces:
 
 **`window.ethereum` (EIP-1193)**
 
-If `window.ethereum` is not already set by another wallet, the SDK sets it to a Ring Wallet provider. The provider has an extra property `isRingWallet = true` for identification.
+The SDK sets `window.ethereum` to a Ring Wallet provider with an extra property `isRingWallet = true` for identification.
+
+- **When running inside Ring Wallet's iframe** — the SDK always overrides `window.ethereum`, even if MetaMask (or another wallet extension) has already injected its own provider into the frame. This ensures that a PC user with MetaMask installed still connects through Ring Wallet when they open your DApp from the wallet.
+- **When loaded as a standalone page** (DApp opened directly in the browser, not in the wallet iframe) — the SDK only injects if `window.ethereum` is not already set, so it does not conflict with MetaMask or other extensions in the user's normal browser session.
 
 ```javascript
 window.ethereum              // EIP-1193 Provider
@@ -151,6 +154,67 @@ function isInRingWallet() {
 ### 2.5 Done
 
 If your DApp uses standard Ethereum libraries (wagmi, ethers.js, web3.js, RainbowKit, etc.), **no further code changes are needed**. The SDK sets up `window.ethereum` and announces via EIP-6963 automatically.
+
+### 2.6 Allow embedding in iframe (when Ring Wallet opens your DApp directly)
+
+If Ring Wallet opens your DApp **without** the proxy (iframe `src` is your DApp URL directly), the browser will refuse to display your page with:
+
+```text
+Refused to display 'https://your-dapp.com/' in a frame because it set 'X-Frame-Options' to 'deny'.
+```
+
+**Cause:** The response from your DApp includes `X-Frame-Options: deny` (or `SAMEORIGIN` with a different origin). That can come from:
+
+- Your **Next.js** app: `next.config.js` / `next.config.mjs` with `headers` or security headers
+- Your **Vercel** project: `vercel.json` `headers`, or Vercel’s own defaults for some deployments
+- Another reverse proxy or CDN in front of your app
+
+**Fix:** Allow your app to be embedded only by Ring Wallet using **Content-Security-Policy `frame-ancestors`**. In modern browsers, `frame-ancestors` overrides `X-Frame-Options`, so this works even if something else sets `X-Frame-Options: deny`.
+
+**1. Vercel (`vercel.json`)** — add a `headers` block for your HTML (adjust `source` to match your app, e.g. `"/(.*)"` or `"/"`). If you already have a `"headers"` array in `vercel.json`, append this object as one more element to that array instead of replacing it.
+
+```json
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self' https://pwa-wallet-git-proxydapp-ring-protocol.vercel.app https://*.vercel.app"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Use your real Ring Wallet production host(s) in place of or in addition to the example above. Multiple hosts are space-separated in `frame-ancestors`.
+
+**2. Next.js (`next.config.js` or `next.config.mjs`)** — if you use framework headers instead of Vercel:
+
+```js
+// next.config.js
+module.exports = {
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors 'self' https://pwa-wallet-git-proxydapp-ring-protocol.vercel.app https://*.vercel.app",
+          },
+        ],
+      },
+    ]
+  },
+}
+```
+
+**3. Remove your own `X-Frame-Options`** — if you explicitly set `X-Frame-Options: deny` (or `SAMEORIGIN`) in `vercel.json` or `next.config.js`, remove that header so only `frame-ancestors` controls embedding. `vercel.json` only **adds** headers; it cannot remove headers Vercel injects, but adding `frame-ancestors` is enough for embedding to work.
+
+After redeploying, open your DApp again from Ring Wallet; the frame error should be gone.
 
 ---
 
