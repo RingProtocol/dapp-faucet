@@ -73,7 +73,7 @@ export function useTokens(account: string | null, web3: Web3 | null) {
 
   // Import a new token
   const importToken = useCallback(
-    async (address: string, symbol?: string, decimals?: string) => {
+    async (address: string) => {
       if (!web3 || !account) {
         throw new Error("Wallet not connected");
       }
@@ -88,26 +88,18 @@ export function useTokens(account: string | null, web3: Web3 | null) {
 
       const contract = new web3.eth.Contract(ERC20_ABI as any, address);
 
-      // Fetch token info
-      let tokenSymbol = symbol;
-      let tokenDecimals = decimals ? parseInt(decimals) : undefined;
-
-      if (!tokenSymbol) {
-        try {
-          tokenSymbol = await contract.methods.symbol().call();
-        } catch (error) {
-          throw new Error(
-            "Could not fetch token symbol. Please provide it manually."
-          );
-        }
+      let tokenSymbol: string;
+      try {
+        tokenSymbol = await contract.methods.symbol().call();
+      } catch {
+        throw new Error("Could not fetch token symbol from contract");
       }
 
-      if (tokenDecimals === undefined) {
-        try {
-          tokenDecimals = parseInt(await contract.methods.decimals().call());
-        } catch (error) {
-          tokenDecimals = 18; // Default to 18
-        }
+      let tokenDecimals: number;
+      try {
+        tokenDecimals = parseInt(await contract.methods.decimals().call());
+      } catch {
+        tokenDecimals = 18;
       }
 
       const token: Token = {

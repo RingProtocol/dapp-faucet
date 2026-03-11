@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 interface TokenImportCardProps {
   isConnected: boolean;
   isLoading: boolean;
-  onImport: (address: string, symbol?: string, decimals?: string) => Promise<void>;
+  onImport: (address: string) => Promise<void>;
 }
 
 export function TokenImportCard({
@@ -15,20 +15,12 @@ export function TokenImportCard({
   onImport,
 }: TokenImportCardProps) {
   const [address, setAddress] = useState("");
-  const [symbol, setSymbol] = useState("");
-  const [decimals, setDecimals] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!address) return;
-    await onImport(
-      address,
-      symbol || undefined,
-      decimals || undefined
-    );
+    await onImport(address);
     setAddress("");
-    setSymbol("");
-    setDecimals("");
   };
 
   return (
@@ -41,30 +33,6 @@ export function TokenImportCard({
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           placeholder="Token Contract Address (0x...)"
-          className={cn(
-            "w-full p-3 border-2 border-gray-200 rounded-lg mb-3",
-            "text-sm font-sans",
-            "focus:outline-none focus:border-primary",
-            "placeholder:text-gray-400"
-          )}
-        />
-        <input
-          type="text"
-          value={symbol}
-          onChange={(e) => setSymbol(e.target.value)}
-          placeholder="Token Symbol (e.g., USDT)"
-          className={cn(
-            "w-full p-3 border-2 border-gray-200 rounded-lg mb-3",
-            "text-sm font-sans",
-            "focus:outline-none focus:border-primary",
-            "placeholder:text-gray-400"
-          )}
-        />
-        <input
-          type="text"
-          value={decimals}
-          onChange={(e) => setDecimals(e.target.value)}
-          placeholder="Decimals (e.g., 18)"
           className={cn(
             "w-full p-3 border-2 border-gray-200 rounded-lg mb-4",
             "text-sm font-sans",

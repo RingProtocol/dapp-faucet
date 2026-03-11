@@ -83,13 +83,9 @@ export default function Home() {
   };
 
   // Handle import token
-  const handleImportToken = async (
-    address: string,
-    symbol?: string,
-    decimals?: string
-  ) => {
+  const handleImportToken = async (address: string) => {
     try {
-      await importToken(address, symbol, decimals);
+      await importToken(address);
       showMessage(`Token imported successfully!`, "success");
     } catch (error: any) {
       showMessage(error.message, "error");
