@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 export type ChainFaucetInfo = {
   chainId: number;
@@ -19,13 +19,83 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
       }));
   }, [chains]);
 
+  const [searchQuery, setSearchQuery] = useState<string>("");
+
   const [selectedChainId, setSelectedChainId] = useState<number>(
     options[0]?.chainId ?? 0
   );
 
+  const didAutoSelectFromProvider = useRef(false);
+
+  useEffect(() => {
+    if (chains.length === 0) return;
+    if (selectedChainId !== 0) return;
+    if (!options[0]?.chainId) return;
+    setSelectedChainId(options[0].chainId);
+  }, [chains.length, options, selectedChainId]);
+
+  useEffect(() => {
+    if (chains.length === 0) return;
+
+    const provider = window.ethereum;
+    if (!provider?.request) return;
+
+    const parseChainId = (value: unknown): number | null => {
+      if (typeof value !== "string") return null;
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+
+      const parsed = trimmed.startsWith("0x")
+        ? parseInt(trimmed, 16)
+        : /^\d+$/.test(trimmed)
+          ? parseInt(trimmed, 10)
+          : NaN;
+
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const applyChainIdIfSupported = (chainId: number) => {
+      if (!options.some((o) => o.chainId === chainId)) return;
+      setSelectedChainId(chainId);
+    };
+
+    const init = async () => {
+      if (didAutoSelectFromProvider.current) return;
+      try {
+        const chainIdValue = await provider.request({ method: "eth_chainId" });
+        const chainId = parseChainId(chainIdValue);
+        if (chainId === null) return;
+        applyChainIdIfSupported(chainId);
+        didAutoSelectFromProvider.current = true;
+      } catch {}
+    };
+
+    void init();
+
+    const handleChainChanged = (chainIdValue: unknown) => {
+      const chainId = parseChainId(chainIdValue);
+      if (chainId === null) return;
+      applyChainIdIfSupported(chainId);
+    };
+
+    provider.on?.("chainChanged", handleChainChanged);
+    return () => provider.removeListener?.("chainChanged", handleChainChanged);
+  }, [chains.length, options]);
+
   const selected = useMemo(() => {
     return chains.find((c) => c.chainId === selectedChainId) || null;
   }, [chains, selectedChainId]);
+
+  const displayedOptions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return options;
+
+    const filtered = options.filter((o) => o.label.toLowerCase().includes(q));
+    if (filtered.some((o) => o.chainId === selectedChainId)) return filtered;
+
+    const selectedOption = options.find((o) => o.chainId === selectedChainId);
+    return selectedOption ? [selectedOption, ...filtered] : filtered;
+  }, [options, searchQuery, selectedChainId]);
 
   const faucets = selected?.faucets ?? [];
 
@@ -44,6 +114,14 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
             <label className="text-sm font-semibold text-gray-700">
               Choose chain
             </label>
+            <input
+              className="w-full p-3 border-2 border-gray-200 rounded-lg text-sm font-sans focus:outline-none focus:border-primary"
+              value={searchQuery}
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                setSearchQuery(e.target.value)
+              }
+              placeholder="Search chains..."
+            />
             <select
               className="w-full p-3 border-2 border-gray-200 rounded-lg text-sm font-sans focus:outline-none focus:border-primary"
               value={selectedChainId}
@@ -51,7 +129,7 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
                 setSelectedChainId(parseInt(e.target.value, 10))
               }
             >
-              {options.map((o) => (
+              {displayedOptions.map((o) => (
                 <option key={o.chainId} value={o.chainId}>
                   {o.label}
                 </option>
