@@ -1,132 +1,54 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { SendTransactionCard } from '@/components/SendTransactionCard';
+import { render, screen, fireEvent } from "@testing-library/react";
+import { ChainFaucetPicker } from "@/components/ChainFaucetPicker";
 
-describe('SendTransactionCard', () => {
-  const mockOnSend = jest.fn().mockResolvedValue(undefined);
+describe("ChainFaucetPicker", () => {
+  it("renders empty state when chains is empty", () => {
+    render(<ChainFaucetPicker chains={[]} />);
 
-  beforeEach(() => {
-    jest.clearAllMocks();
+    expect(
+      screen.queryByText("未从 chains.yaml 解析到任何 faucet 配置")
+    ).not.toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
   });
 
-  it('does not render when not connected', () => {
-    const { container } = render(
-      <SendTransactionCard
-        isConnected={false}
-        isLoading={false}
-        onSend={mockOnSend}
-      />
-    );
-
-    expect(container.firstChild).toBeNull();
-  });
-
-  it('renders form when connected', () => {
+  it("renders options sorted by name and shows faucets for the selected chain", () => {
     render(
-      <SendTransactionCard
-        isConnected={true}
-        isLoading={false}
-        onSend={mockOnSend}
+      <ChainFaucetPicker
+        chains={[
+          { chainId: 2, name: "B Chain", faucets: ["https://b.example/faucet"] },
+          {
+            chainId: 1,
+            name: "A Chain",
+            faucets: ["https://a.example/faucet-1", "https://a.example/faucet-2"],
+          },
+        ]}
       />
     );
 
-    expect(screen.getByText('Send ETH')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/recipient address/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/amount/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /send transaction/i })).toBeInTheDocument();
+    const select = screen.getByRole("combobox");
+    expect((select as HTMLSelectElement).value).toBe("1");
+
+    const links = screen.getAllByRole("link");
+    expect(links).toHaveLength(2);
+    expect((links[0] as HTMLAnchorElement).href).toBe("https://a.example/faucet-1");
+    expect((links[1] as HTMLAnchorElement).href).toBe("https://a.example/faucet-2");
   });
 
-  it('updates input values on change', () => {
+  it("updates faucets when changing selection", () => {
     render(
-      <SendTransactionCard
-        isConnected={true}
-        isLoading={false}
-        onSend={mockOnSend}
+      <ChainFaucetPicker
+        chains={[
+          { chainId: 2, name: "B Chain", faucets: ["https://b.example/faucet"] },
+          { chainId: 1, name: "A Chain", faucets: ["https://a.example/faucet"] },
+        ]}
       />
     );
 
-    const addressInput = screen.getByPlaceholderText(/recipient address/i);
-    const amountInput = screen.getByPlaceholderText(/amount/i);
+    const select = screen.getByRole("combobox");
+    fireEvent.change(select, { target: { value: "2" } });
 
-    fireEvent.change(addressInput, { target: { value: '0x1234567890' } });
-    fireEvent.change(amountInput, { target: { value: '1.5' } });
-
-    expect(addressInput).toHaveValue('0x1234567890');
-    expect(amountInput).toHaveValue(1.5);
-  });
-
-  it('calls onSend with correct values and clears inputs', async () => {
-    render(
-      <SendTransactionCard
-        isConnected={true}
-        isLoading={false}
-        onSend={mockOnSend}
-      />
-    );
-
-    const addressInput = screen.getByPlaceholderText(/recipient address/i);
-    const amountInput = screen.getByPlaceholderText(/amount/i);
-    const submitButton = screen.getByRole('button', { name: /send transaction/i });
-
-    fireEvent.change(addressInput, { target: { value: '0x1234567890123456789012345678901234567890' } });
-    fireEvent.change(amountInput, { target: { value: '1.5' } });
-    fireEvent.click(submitButton);
-
-    await waitFor(() => {
-      expect(mockOnSend).toHaveBeenCalledWith('0x1234567890123456789012345678901234567890', '1.5');
-    });
-
-    // Inputs should be cleared after successful send
-    await waitFor(() => {
-      expect(addressInput).toHaveValue('');
-      expect(amountInput).toHaveValue(null);
-    });
-  });
-
-  it('does not submit when inputs are empty', () => {
-    render(
-      <SendTransactionCard
-        isConnected={true}
-        isLoading={false}
-        onSend={mockOnSend}
-      />
-    );
-
-    const submitButton = screen.getByRole('button', { name: /send transaction/i });
-    
-    // Button should be disabled when inputs are empty
-    expect(submitButton).toBeDisabled();
-  });
-
-  it('shows loading state', () => {
-    render(
-      <SendTransactionCard
-        isConnected={true}
-        isLoading={true}
-        onSend={mockOnSend}
-      />
-    );
-
-    const submitButton = screen.getByRole('button', { name: /sending/i });
-    expect(submitButton).toBeDisabled();
-    expect(submitButton).toHaveTextContent(/sending/i);
-  });
-
-  it('disables submit when loading', () => {
-    render(
-      <SendTransactionCard
-        isConnected={true}
-        isLoading={true}
-        onSend={mockOnSend}
-      />
-    );
-
-    const addressInput = screen.getByPlaceholderText(/recipient address/i);
-    const amountInput = screen.getByPlaceholderText(/amount/i);
-
-    fireEvent.change(addressInput, { target: { value: '0x1234567890' } });
-    fireEvent.change(amountInput, { target: { value: '1.0' } });
-
-    const submitButton = screen.getByRole('button');
-    expect(submitButton).toBeDisabled();
+    const links = screen.getAllByRole("link");
+    expect(links).toHaveLength(1);
+    expect((links[0] as HTMLAnchorElement).href).toBe("https://b.example/faucet");
   });
 });

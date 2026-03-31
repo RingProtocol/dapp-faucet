@@ -98,32 +98,32 @@ async function runTests() {
   // Test 3: Page title
   await test('Page has correct title', async () => {
     const response = await makeRequest('/');
-    if (!response.body.includes('First DApp')) {
-      throw new Error('Page title "First DApp" not found');
+    if (!response.body.includes('Faucet Launcher')) {
+      throw new Error('Page title "Faucet Launcher" not found');
     }
   });
 
   // Test 4: Main heading
   await test('Page contains main heading', async () => {
     const response = await makeRequest('/');
-    if (!response.body.includes('🚀 First DApp')) {
+    if (!response.body.includes('Faucet Launcher')) {
       throw new Error('Main heading not found');
     }
   });
 
-  // Test 5: Wallet section exists
-  await test('Wallet section is present', async () => {
+  // Test 5: Chain selector exists
+  await test('Chain selector is present', async () => {
     const response = await makeRequest('/');
-    if (!response.body.includes('Wallet')) {
-      throw new Error('Wallet section not found');
+    if (!response.body.includes('选择链')) {
+      throw new Error('Chain selector not found');
     }
   });
 
-  // Test 6: Connect button exists
-  await test('Connect Wallet button is present', async () => {
+  // Test 6: Faucet section exists
+  await test('Faucet section is present', async () => {
     const response = await makeRequest('/');
-    if (!response.body.includes('Connect Wallet')) {
-      throw new Error('Connect Wallet button not found');
+    if (!response.body.includes('Faucet')) {
+      throw new Error('Faucet section not found');
     }
   });
 

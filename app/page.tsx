@@ -25,8 +25,6 @@ function parseChainsYamlForFaucets(yaml: string): ChainFaucetInfo[] {
 
   const out: ChainFaucetInfo[] = [];
   let current: Partial<ChainFaucetInfo> | null = null;
-  let inFaucets = false;
-  let faucetsIndent = -1;
 
   const pushCurrent = () => {
     if (!current) return;
@@ -44,36 +42,24 @@ function parseChainsYamlForFaucets(yaml: string): ChainFaucetInfo[] {
     const line = raw.trimEnd();
     if (!line || line.trim() === "---") continue;
 
-    const isNewItem = /^-\s+name:\s*(.+)$/.exec(line.trim());
+    const isNewItem = /^\s*-\s+name:\s*(.+)$/.exec(line.trim());
     if (isNewItem) {
       pushCurrent();
       current = { name: isNewItem[1].trim(), faucets: [] };
-      inFaucets = false;
-      faucetsIndent = -1;
       continue;
     }
 
     if (!current) continue;
 
-    const leadingSpaces = raw.length - raw.trimStart().length;
-
-    if (inFaucets) {
-      if (leadingSpaces <= faucetsIndent && line.trim()) {
-        inFaucets = false;
-        faucetsIndent = -1;
-      } else {
-        const faucetMatch = /^\s*-\s*(\S.+)$/.exec(raw);
-        if (faucetMatch) {
-          const url = faucetMatch[1].trim();
-          if (url) (current.faucets as string[]).push(url);
-        }
-        continue;
-      }
-    }
-
-    const chainIdMatch = /^\s*chainId:\s*(\d+)\s*$/.exec(raw);
+    const chainIdMatch = /^\s*chainId:\s*(.+?)\s*$/.exec(raw);
     if (chainIdMatch) {
-      current.chainId = parseInt(chainIdMatch[1], 10);
+      const value = chainIdMatch[1].trim();
+      const parsed = value.startsWith("0x")
+        ? parseInt(value, 16)
+        : /^\d+$/.test(value)
+          ? parseInt(value, 10)
+          : NaN;
+      if (Number.isFinite(parsed)) current.chainId = parsed;
       continue;
     }
 
@@ -85,9 +71,22 @@ function parseChainsYamlForFaucets(yaml: string): ChainFaucetInfo[] {
 
     const faucetsStart = /^\s*faucets:\s*$/.exec(raw);
     if (faucetsStart) {
-      inFaucets = true;
-      faucetsIndent = leadingSpaces;
       current.faucets = [];
+      for (let j = i + 1; j < lines.length; j++) {
+        const nextRaw = lines[j];
+        const next = nextRaw.trim();
+        if (!next) continue;
+
+        const faucetMatch = /^\s*-\s*(\S.+)$/.exec(nextRaw);
+        if (!faucetMatch) {
+          i = j - 1;
+          break;
+        }
+
+        const url = faucetMatch[1].trim();
+        if (url) (current.faucets as string[]).push(url);
+        i = j;
+      }
       continue;
     }
   }

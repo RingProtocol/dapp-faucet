@@ -9,17 +9,6 @@ export type ChainFaucetInfo = {
 };
 
 export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
-  if (chains.length === 0) {
-    return (
-      <div className="bg-white rounded-2xl p-6 shadow-card">
-        <div className="text-sm font-semibold text-gray-700 mb-1">Faucet</div>
-        <div className="text-sm text-gray-500">
-          未从 chains.yaml 解析到任何 faucet 配置
-        </div>
-      </div>
-    );
-  }
-
   const options = useMemo(() => {
     return chains
       .slice()
@@ -42,48 +31,59 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-card">
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-semibold text-gray-700">
-          选择链（Chain）
-        </label>
-        <select
-          className="w-full p-3 border-2 border-gray-200 rounded-lg text-sm font-sans focus:outline-none focus:border-primary"
-          value={selectedChainId}
-          onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-            setSelectedChainId(parseInt(e.target.value, 10))
-          }
-        >
-          {options.map((o) => (
-            <option key={o.chainId} value={o.chainId}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="mt-5">
-        <div className="text-sm font-semibold text-gray-700 mb-2">
-          Faucet 链接
-        </div>
-
-        {faucets.length === 0 ? (
-          <div className="text-sm text-gray-500">该链未配置 faucet</div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {faucets.map((url) => (
-              <a
-                key={url}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center bg-primary text-white py-2.5 px-4 rounded-lg font-semibold transition-all hover:opacity-95"
-              >
-                打开 Faucet
-              </a>
-            ))}
+      {chains.length === 0 ? (
+        <>
+          <div className="text-sm font-semibold text-gray-700 mb-1">Faucet</div>
+          <div className="text-sm text-gray-500">
+            未从 chains.yaml 解析到任何 faucet 配置
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <>
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-gray-700">
+              选择链（Chain）
+            </label>
+            <select
+              className="w-full p-3 border-2 border-gray-200 rounded-lg text-sm font-sans focus:outline-none focus:border-primary"
+              value={selectedChainId}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                setSelectedChainId(parseInt(e.target.value, 10))
+              }
+            >
+              {options.map((o) => (
+                <option key={o.chainId} value={o.chainId}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mt-5">
+            <div className="text-sm font-semibold text-gray-700 mb-2">
+              Faucet 链接
+            </div>
+
+            {faucets.length === 0 ? (
+              <div className="text-sm text-gray-500">该链未配置 faucet</div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {faucets.map((url) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center bg-primary text-white py-2.5 px-4 rounded-lg font-semibold transition-all hover:opacity-95"
+                  >
+                    打开 Faucet
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

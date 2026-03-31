@@ -3,8 +3,8 @@ import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "First DApp",
-  description: "A simple decentralized application",
+  title: "Faucet Launcher",
+  description: "Pick a chain and open its faucet",
 };
 
 export default function RootLayout({
