@@ -74,8 +74,6 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
                   <a
                     key={url}
                     href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="inline-flex items-center justify-center bg-primary text-white py-2.5 px-4 rounded-lg font-semibold transition-all hover:opacity-95"
                   >
                     Open faucet

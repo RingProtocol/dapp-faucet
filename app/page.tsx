@@ -108,7 +108,7 @@ export default async function Home() {
           Faucet Launcher
         </h1>
         <p className="text-white/80 text-center mb-8">
-          在 iframe / RingWallet 中选择链并打开对应 faucet
+          Choose a chain in the iframe / RingWallet and open its faucet
         </p>
 
         <ChainFaucetPicker chains={chains} />
