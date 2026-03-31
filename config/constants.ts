@@ -1,12 +1,30 @@
-import { Web3 } from "web3";
-
-// Storage Keys
 export const STORAGE_KEYS = {
   TOKENS: "firstdapp_tokens",
   TRANSACTIONS: "firstdapp_transactions",
+} as const;
+
+export type Token = {
+  address: string;
+  symbol: string;
+  decimals: number;
+  addedAt?: string;
 };
 
-// ERC20 Standard ABI
+export type TransactionStatus = "pending" | "confirmed" | "failed";
+export type TransactionType = "sent" | "received";
+
+export type Transaction = {
+  hash: string;
+  type: TransactionType;
+  to?: string;
+  from?: string;
+  amount: string;
+  status: TransactionStatus;
+  timestamp: number;
+  network?: string;
+  blockNumber?: number;
+};
+
 export const ERC20_ABI = [
   {
     constant: true,
@@ -44,208 +62,161 @@ export const ERC20_ABI = [
     stateMutability: "view",
     type: "function",
   },
-];
+] as const;
 
-// Normalize Alchemy API key: accept either "key" or full URL "https://.../v2/key"
-function getAlchemyApiKey(): string | null {
-  if (typeof process === "undefined") return null;
-  const raw = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY?.trim();
-  if (!raw) return null;
-  if (raw.startsWith("http")) {
-    const lastSegment = raw.split("/").pop()?.split("?")[0];
-    return lastSegment && !lastSegment.startsWith("http") ? lastSegment : null;
-  }
-  return raw;
-}
+export const UI_CONFIG = {
+  ADDRESS_DISPLAY_LENGTH: 6,
+  BALANCE_DECIMALS: 4,
+  MAX_TRANSACTION_HISTORY: 50,
+} as const;
 
-// RPC URL for read queries (Alchemy when key is set)
-export function getRpcUrl(chainId: number): string | null {
-  const key = getAlchemyApiKey();
-  if (!key) return null;
-  if (chainId === 1) {
-    return `https://eth-mainnet.g.alchemy.com/v2/${key}`;
-  }
-  if (chainId === 11155111) {
-    return `https://eth-sepolia.g.alchemy.com/v2/${key}`;
-  }
-  return null;
-}
+export const GAS_CONFIG = {
+  STANDARD_TRANSFER: 21000,
+} as const;
 
-// Network Configuration
-export const NETWORKS: Record<
-  number,
-  { name: string; explorer: string }
-> = {
+export const NETWORKS: Record<number, { name: string; explorer: string }> = {
   1: { name: "Ethereum Mainnet", explorer: "https://etherscan.io/tx/" },
-  3: { name: "Ropsten", explorer: "https://ropsten.etherscan.io/tx/" },
-  4: { name: "Rinkeby", explorer: "https://rinkeby.etherscan.io/tx/" },
   5: { name: "Goerli", explorer: "https://goerli.etherscan.io/tx/" },
-  42: { name: "Kovan", explorer: "https://kovan.etherscan.io/tx/" },
-  56: { name: "BSC Mainnet", explorer: "https://bscscan.com/tx/" },
-  97: { name: "BSC Testnet", explorer: "https://testnet.bscscan.com/tx/" },
-  137: { name: "Polygon", explorer: "https://polygonscan.com/tx/" },
-  80001: { name: "Mumbai", explorer: "https://mumbai.polygonscan.com/tx/" },
-  1337: { name: "Local", explorer: "" },
-  31337: { name: "Hardhat", explorer: "" },
   11155111: { name: "Sepolia", explorer: "https://sepolia.etherscan.io/tx/" },
+  137: { name: "Polygon", explorer: "https://polygonscan.com/tx/" },
 };
 
-// Chains supported for switching (wallet_switchEthereumChain / wallet_addEthereumChain)
-export const SWITCHABLE_CHAINS: {
+export const ETHERSCAN_API_URLS: Record<number, string> = {
+  1: "https://api.etherscan.io/api",
+  5: "https://api-goerli.etherscan.io/api",
+  11155111: "https://api-sepolia.etherscan.io/api",
+  137: "https://api.polygonscan.com/api",
+};
+
+const RPC_URLS: Record<number, string[]> = {
+  1: [
+    "https://cloudflare-eth.com",
+    "https://ethereum-rpc.publicnode.com",
+  ],
+  11155111: ["https://sepolia.gateway.tenderly.co", "https://sepolia.drpc.org"],
+  137: ["https://polygon-rpc.com", "https://polygon-bor-rpc.publicnode.com"],
+};
+
+export function getRpcUrl(chainId: number): string | null {
+  const urls = RPC_URLS[Number(chainId)];
+  return Array.isArray(urls) && urls.length > 0 ? urls[0] : null;
+}
+
+export type SwitchableChain = {
   chainId: number;
-  name: string;
   hexChainId: string;
+  name: string;
   rpcUrl: string;
   explorer: string;
   nativeCurrency: { name: string; symbol: string; decimals: number };
-}[] = [
+};
+
+export const SWITCHABLE_CHAINS: SwitchableChain[] = [
   {
     chainId: 1,
-    name: "Ethereum Mainnet",
     hexChainId: "0x1",
-    rpcUrl: "https://eth.llamarpc.com",
+    name: "Ethereum Mainnet",
+    rpcUrl: getRpcUrl(1) || "https://cloudflare-eth.com",
     explorer: "https://etherscan.io",
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   },
   {
     chainId: 11155111,
-    name: "Sepolia",
     hexChainId: "0xaa36a7",
-    rpcUrl: "https://rpc.sepolia.org",
+    name: "Sepolia",
+    rpcUrl: getRpcUrl(11155111) || "https://sepolia.drpc.org",
     explorer: "https://sepolia.etherscan.io",
     nativeCurrency: { name: "Sepolia Ether", symbol: "ETH", decimals: 18 },
   },
+  {
+    chainId: 137,
+    hexChainId: "0x89",
+    name: "Polygon",
+    rpcUrl: getRpcUrl(137) || "https://polygon-rpc.com",
+    explorer: "https://polygonscan.com",
+    nativeCurrency: { name: "MATIC", symbol: "MATIC", decimals: 18 },
+  },
 ];
 
-// Etherscan API URLs
-export const ETHERSCAN_API_URLS: Record<number, string> = {
-  1: "https://api.etherscan.io/api",
-  5: "https://api-goerli.etherscan.io/api",
-  11155111: "https://api-sepolia.etherscan.io/api",
-};
-
-// Gas Configuration
-export const GAS_CONFIG = {
-  STANDARD_TRANSFER: 21000,
-};
-
-// UI Configuration
-export const UI_CONFIG = {
-  ADDRESS_DISPLAY_LENGTH: 6,
-  BALANCE_DECIMALS: 4,
-  MAX_TRANSACTION_HISTORY: 50,
-};
-
-// Types
-export interface Token {
-  address: string;
-  symbol: string;
-  decimals: number;
-  addedAt?: string;
+function getLocalStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
 }
 
-export interface Transaction {
-  hash: string;
-  type: "sent" | "received";
-  to?: string;
-  from?: string;
-  amount: string;
-  status: "pending" | "confirmed" | "failed";
-  timestamp: number;
-  network?: string;
-  blockNumber?: number;
+function safeParseJson<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
 }
 
-// Storage Helpers
 export const TokenStorage = {
   getAll(): Token[] {
-    try {
-      const tokens = localStorage.getItem(STORAGE_KEYS.TOKENS);
-      return tokens ? JSON.parse(tokens) : [];
-    } catch (error) {
-      console.error("Error reading tokens from localStorage:", error);
-      return [];
-    }
+    const storage = getLocalStorage();
+    if (!storage) return [];
+    const tokens = safeParseJson<Token[]>(storage.getItem(STORAGE_KEYS.TOKENS), []);
+    return Array.isArray(tokens) ? tokens : [];
   },
-
   save(token: Token): void {
-    const tokens = this.getAll();
-    tokens.push({
+    const storage = getLocalStorage();
+    if (!storage) return;
+    const all = TokenStorage.getAll();
+    const normalized = token.address.toLowerCase();
+    const without = all.filter((t) => t.address.toLowerCase() !== normalized);
+    const next: Token = {
       ...token,
-      addedAt: new Date().toISOString(),
-    });
-    localStorage.setItem(STORAGE_KEYS.TOKENS, JSON.stringify(tokens));
+      addedAt: token.addedAt || new Date().toISOString(),
+    };
+    storage.setItem(STORAGE_KEYS.TOKENS, JSON.stringify([...without, next]));
   },
-
-  remove(address: string): void {
-    const tokens = this.getAll();
-    const filtered = tokens.filter(
-      (t) => t.address.toLowerCase() !== address.toLowerCase()
-    );
-    localStorage.setItem(STORAGE_KEYS.TOKENS, JSON.stringify(filtered));
-  },
-
   exists(address: string): boolean {
-    const tokens = this.getAll();
-    return tokens.some(
-      (t) => t.address.toLowerCase() === address.toLowerCase()
-    );
+    const normalized = address.toLowerCase();
+    return TokenStorage.getAll().some((t) => t.address.toLowerCase() === normalized);
+  },
+  remove(address: string): void {
+    const storage = getLocalStorage();
+    if (!storage) return;
+    const normalized = address.toLowerCase();
+    const next = TokenStorage.getAll().filter((t) => t.address.toLowerCase() !== normalized);
+    storage.setItem(STORAGE_KEYS.TOKENS, JSON.stringify(next));
   },
 };
+
+function txKey(account: string): string {
+  return `${STORAGE_KEYS.TRANSACTIONS}_${account.toLowerCase()}`;
+}
 
 export const TransactionStorage = {
   getAll(account: string | null): Transaction[] {
     if (!account) return [];
-    try {
-      const allTxs = JSON.parse(
-        localStorage.getItem(STORAGE_KEYS.TRANSACTIONS) || "{}"
-      );
-      return allTxs[account.toLowerCase()] || [];
-    } catch (error) {
-      console.error("Error reading transactions from localStorage:", error);
-      return [];
-    }
+    const storage = getLocalStorage();
+    if (!storage) return [];
+    const txs = safeParseJson<Transaction[]>(storage.getItem(txKey(account)), []);
+    const list = Array.isArray(txs) ? txs : [];
+    return list
+      .slice()
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+      .slice(0, UI_CONFIG.MAX_TRANSACTION_HISTORY);
   },
-
   add(account: string, tx: Transaction): void {
-    const allTxs = JSON.parse(
-      localStorage.getItem(STORAGE_KEYS.TRANSACTIONS) || "{}"
-    );
-    const accountKey = account.toLowerCase();
-
-    if (!allTxs[accountKey]) {
-      allTxs[accountKey] = [];
-    }
-
-    allTxs[accountKey].unshift(tx);
-
-    // Limit history size
-    if (allTxs[accountKey].length > UI_CONFIG.MAX_TRANSACTION_HISTORY) {
-      allTxs[accountKey] = allTxs[accountKey].slice(
-        0,
-        UI_CONFIG.MAX_TRANSACTION_HISTORY
-      );
-    }
-
-    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(allTxs));
+    const storage = getLocalStorage();
+    if (!storage) return;
+    const existing = TransactionStorage.getAll(account);
+    const next = [tx, ...existing].slice(0, UI_CONFIG.MAX_TRANSACTION_HISTORY);
+    storage.setItem(txKey(account), JSON.stringify(next));
   },
-
-  update(
-    account: string,
-    oldHash: string,
-    updates: Partial<Transaction>
-  ): void {
-    const allTxs = JSON.parse(
-      localStorage.getItem(STORAGE_KEYS.TRANSACTIONS) || "{}"
-    );
-    const accountKey = account.toLowerCase();
-
-    if (allTxs[accountKey]) {
-      const index = allTxs[accountKey].findIndex((tx: Transaction) => tx.hash === oldHash);
-      if (index !== -1) {
-        allTxs[accountKey][index] = { ...allTxs[accountKey][index], ...updates };
-        localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(allTxs));
-      }
-    }
+  update(account: string, hash: string, update: Partial<Transaction>): void {
+    const storage = getLocalStorage();
+    if (!storage) return;
+    const existing = TransactionStorage.getAll(account);
+    const next = existing.map((tx) => (tx.hash === hash ? { ...tx, ...update } : tx));
+    storage.setItem(txKey(account), JSON.stringify(next));
   },
 };
+
