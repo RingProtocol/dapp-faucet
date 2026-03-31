@@ -5,6 +5,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Faucet Launcher",
   description: "Pick a chain and open its faucet",
+  icons: {
+    icon: "/faucet.jpeg",
+  },
 };
 
 export default function RootLayout({
@@ -16,6 +19,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <Script src="/dappsdk.js" strategy="beforeInteractive" />
+        <link rel="icon" href="/faucet.jpeg" type="image/jpeg" />
       </head>
       <body className="antialiased">{children}</body>
     </html>
