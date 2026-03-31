@@ -6,7 +6,7 @@ describe("ChainFaucetPicker", () => {
     render(<ChainFaucetPicker chains={[]} />);
 
     expect(
-      screen.queryByText("未从 chains.yaml 解析到任何 faucet 配置")
+      screen.queryByText("No faucet entries found in chains.yaml")
     ).not.toBeNull();
     expect(screen.queryByRole("combobox")).toBeNull();
   });

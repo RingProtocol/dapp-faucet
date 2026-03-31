@@ -35,14 +35,14 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
         <>
           <div className="text-sm font-semibold text-gray-700 mb-1">Faucet</div>
           <div className="text-sm text-gray-500">
-            未从 chains.yaml 解析到任何 faucet 配置
+            No faucet entries found in chains.yaml
           </div>
         </>
       ) : (
         <>
           <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-gray-700">
-              选择链（Chain）
+              Choose chain
             </label>
             <select
               className="w-full p-3 border-2 border-gray-200 rounded-lg text-sm font-sans focus:outline-none focus:border-primary"
@@ -61,11 +61,13 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
 
           <div className="mt-5">
             <div className="text-sm font-semibold text-gray-700 mb-2">
-              Faucet 链接
+              Faucet links
             </div>
 
             {faucets.length === 0 ? (
-              <div className="text-sm text-gray-500">该链未配置 faucet</div>
+              <div className="text-sm text-gray-500">
+                No faucet configured for this chain
+              </div>
             ) : (
               <div className="flex flex-col gap-2">
                 {faucets.map((url) => (
@@ -76,7 +78,7 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center bg-primary text-white py-2.5 px-4 rounded-lg font-semibold transition-all hover:opacity-95"
                   >
-                    打开 Faucet
+                    Open faucet
                   </a>
                 ))}
               </div>

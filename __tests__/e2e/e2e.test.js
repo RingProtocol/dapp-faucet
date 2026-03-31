@@ -114,7 +114,7 @@ async function runTests() {
   // Test 5: Chain selector exists
   await test('Chain selector is present', async () => {
     const response = await makeRequest('/');
-    if (!response.body.includes('选择链')) {
+    if (!response.body.includes('Choose chain')) {
       throw new Error('Chain selector not found');
     }
   });
