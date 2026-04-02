@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 export type ChainFaucetInfo = {
   chainId: number;
@@ -8,7 +8,21 @@ export type ChainFaucetInfo = {
   faucets: string[];
 };
 
+function parseFirstEthAccount(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  const first = value[0];
+  if (typeof first !== "string") return null;
+  const trimmed = first.trim();
+  return trimmed ? trimmed : null;
+}
+
 export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [walletStatus, setWalletStatus] = useState<
+    "loading" | "no_provider" | "disconnected" | "connected"
+  >("loading");
+  const [connectBusy, setConnectBusy] = useState(false);
+
   const options = useMemo(() => {
     return chains
       .slice()
@@ -26,6 +40,39 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
   );
 
   const didAutoSelectFromProvider = useRef(false);
+
+  useEffect(() => {
+    const provider = typeof window !== "undefined" ? window.ethereum : undefined;
+    if (!provider?.request) {
+      setWalletAddress(null);
+      setWalletStatus("no_provider");
+      return;
+    }
+
+    const refresh = async () => {
+      try {
+        const accounts = await provider.request({ method: "eth_accounts" });
+        const address = parseFirstEthAccount(accounts);
+        setWalletAddress(address);
+        setWalletStatus(address ? "connected" : "disconnected");
+      } catch {
+        setWalletAddress(null);
+        setWalletStatus("disconnected");
+      }
+    };
+
+    void refresh();
+
+    const handleAccountsChanged = (accounts: unknown) => {
+      const address = parseFirstEthAccount(accounts);
+      setWalletAddress(address);
+      setWalletStatus(address ? "connected" : "disconnected");
+    };
+
+    provider.on?.("accountsChanged", handleAccountsChanged);
+    return () =>
+      provider.removeListener?.("accountsChanged", handleAccountsChanged);
+  }, []);
 
   useEffect(() => {
     if (chains.length === 0) return;
@@ -82,6 +129,26 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
     return () => provider.removeListener?.("chainChanged", handleChainChanged);
   }, [chains.length, options]);
 
+  const handleConnectWallet = useCallback(async () => {
+    const provider = typeof window !== "undefined" ? window.ethereum : undefined;
+    if (!provider?.request) return;
+
+    setConnectBusy(true);
+    try {
+      const accounts = await provider.request({
+        method: "eth_requestAccounts",
+      });
+      const address = parseFirstEthAccount(accounts);
+      setWalletAddress(address);
+      setWalletStatus(address ? "connected" : "disconnected");
+    } catch {
+      setWalletAddress(null);
+      setWalletStatus("disconnected");
+    } finally {
+      setConnectBusy(false);
+    }
+  }, []);
+
   const selected = useMemo(() => {
     return chains.find((c) => c.chainId === selectedChainId) || null;
   }, [chains, selectedChainId]);
@@ -98,6 +165,11 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
   }, [options, searchQuery, selectedChainId]);
 
   const faucets = selected?.faucets ?? [];
+  const resolvedFaucetUrls = useMemo(() => {
+    return faucets.map((url) =>
+      walletAddress ? url.replace(/\$\{ADDRESS\}/g, encodeURIComponent(walletAddress)) : url
+    );
+  }, [faucets, walletAddress]);
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-card">
@@ -135,6 +207,32 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
                 </option>
               ))}
             </select>
+            <div className="text-xs text-gray-600">
+              <span className="font-semibold text-gray-700">已连接地址：</span>
+              {walletStatus === "loading" ? (
+                <span className="text-gray-500">读取中…</span>
+              ) : walletStatus === "no_provider" ? (
+                <span className="text-gray-500">未检测到钱包</span>
+              ) : walletAddress ? (
+                <span className="font-mono text-gray-900 break-all">
+                  {walletAddress}
+                </span>
+              ) : (
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <span className="text-gray-500">
+                    未连接（eth_accounts 为空）
+                  </span>
+                  <button
+                    type="button"
+                    disabled={connectBusy}
+                    onClick={() => void handleConnectWallet()}
+                    className="shrink-0 rounded-lg border-2 border-primary bg-primary px-3 py-1 text-xs font-semibold text-white transition-all hover:opacity-95 disabled:opacity-50"
+                  >
+                    {connectBusy ? "连接中…" : "连接钱包"}
+                  </button>
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="mt-5">
@@ -148,10 +246,12 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                {faucets.map((url) => (
+                {resolvedFaucetUrls.map((url) => (
                   <a
                     key={url}
                     href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center justify-center bg-primary text-white py-2.5 px-4 rounded-lg font-semibold transition-all hover:opacity-95"
                   >
                     Open faucet
