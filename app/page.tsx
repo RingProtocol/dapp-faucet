@@ -1,4 +1,5 @@
-import { ChainFaucetPicker, type ChainFaucetInfo } from "@/components/ChainFaucetPicker";
+import { FaucetLauncherShell } from "@/components/FaucetLauncherShell";
+import { type ChainFaucetInfo } from "@/components/ChainFaucetPicker";
 import { readFile } from "node:fs/promises";
 import { access } from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
@@ -111,7 +112,7 @@ export default async function Home() {
           Choose a chain in the iframe / RingWallet and open its faucet
         </p>
 
-        <ChainFaucetPicker chains={chains} />
+        <FaucetLauncherShell chains={chains} />
       </div>
     </main>
   );
