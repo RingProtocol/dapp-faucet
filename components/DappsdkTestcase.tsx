@@ -110,6 +110,22 @@ const DEFAULT_ADD_CHAIN = {
   blockExplorerUrls: ["https://sepolia.etherscan.io"],
 };
 
+const APPROVE_TEST_ID = "erc20_approve_simulation";
+const MAX_UINT256_DECIMAL =
+  "115792089237316195423570985008687907853269984665640564039457584007913129639935";
+
+type ApproveForm = {
+  tokenAddress: string;
+  spenderAddress: string;
+  amount: string;
+};
+
+const DEFAULT_APPROVE_FORM: ApproveForm = {
+  tokenAddress: "0x2b95EB0A2461BBFCe6d65fe6DE259795D7662532",
+  spenderAddress: "0x9A76e0d12832676d13C54B7F4dE659D9df875AB9",
+  amount: MAX_UINT256_DECIMAL,
+};
+
 type SdkSection = "基础与链" | "只读 RPC" | "签名" | "广播";
 
 type SdkRow = {
@@ -420,6 +436,66 @@ function formatError(err: unknown): string {
   return String(err);
 }
 
+function isAddress(value: string): boolean {
+  return /^0x[a-fA-F0-9]{40}$/.test(value.trim());
+}
+
+function parseUint256Input(value: string): bigint | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = BigInt(trimmed);
+    if (parsed < BigInt(0)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function padToBytes(hex: string, bytes: number): string {
+  return hex.padStart(bytes * 2, "0");
+}
+
+function encodeApproveCalldata(spenderAddress: string, amount: string): string | null {
+  if (!isAddress(spenderAddress)) return null;
+  const parsedAmount = parseUint256Input(amount);
+  if (parsedAmount == null) return null;
+  const spender = spenderAddress.trim().slice(2).toLowerCase();
+  const amountHex = parsedAmount.toString(16);
+  if (amountHex.length > 64) return null;
+  return `0x095ea7b3${padToBytes(spender, 32)}${padToBytes(amountHex, 32)}`;
+}
+
+function buildApproveTransaction(
+  from: string,
+  form: ApproveForm
+): { tx: Record<string, string>; calldata: string } | { error: string } {
+  if (!isAddress(from)) {
+    return { error: "当前账户地址无效，请先连接钱包。" };
+  }
+  if (!isAddress(form.tokenAddress)) {
+    return { error: "Token 合约地址格式不正确。" };
+  }
+  if (!isAddress(form.spenderAddress)) {
+    return { error: "Spender 地址格式不正确。" };
+  }
+
+  const calldata = encodeApproveCalldata(form.spenderAddress, form.amount);
+  if (!calldata) {
+    return { error: "Approve amount 仅支持非负十进制或 0x 开头的十六进制。" };
+  }
+
+  return {
+    tx: {
+      from,
+      to: form.tokenAddress.trim(),
+      value: "0x0",
+      data: calldata,
+    },
+    calldata,
+  };
+}
+
 async function resolveParamsWithAccounts(
   row: SdkRow,
   eth: NonNullable<Window["ethereum"]>
@@ -440,6 +516,8 @@ export function DappsdkTestcase() {
     {}
   );
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
+  const [approveForm, setApproveForm] = useState<ApproveForm>(DEFAULT_APPROVE_FORM);
+  const [approvePreview, setApprovePreview] = useState<ParamPreview | null>(null);
 
   const rowsBySection = useMemo(() => {
     const map = new Map<SdkSection, SdkRow[]>();
@@ -533,6 +611,117 @@ export function DappsdkTestcase() {
     }
   }, []);
 
+  const updateApproveForm = useCallback(
+    (field: keyof ApproveForm, value: string) => {
+      setApproveForm((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+    },
+    []
+  );
+
+  const previewApprove = useCallback(async () => {
+    const eth = typeof window !== "undefined" ? window.ethereum : undefined;
+    if (!eth?.request) {
+      setApprovePreview({
+        json: "",
+        hint: "无 provider，无法预览 approve 交易。",
+      });
+      return;
+    }
+
+    setPreviewLoadingId(APPROVE_TEST_ID);
+    try {
+      const accounts = (await eth.request({
+        method: "eth_accounts",
+      })) as string[];
+      const account = Array.isArray(accounts) ? (accounts[0] ?? ZERO) : ZERO;
+      const built = buildApproveTransaction(account, approveForm);
+      if ("error" in built) {
+        setApprovePreview({
+          json: "",
+          hint: built.error,
+        });
+        return;
+      }
+
+      setApprovePreview({
+        json: JSON.stringify([built.tx], null, 2),
+        hint:
+          account === ZERO
+            ? "eth_accounts 为空，from 仍为零地址占位；可先 Run「eth_requestAccounts」后再预览。"
+            : `eth_accounts[0]: ${account}`,
+      });
+    } catch (e) {
+      setApprovePreview({
+        json: "",
+        hint: `预览失败: ${formatError(e)}`,
+      });
+    } finally {
+      setPreviewLoadingId(null);
+    }
+  }, [approveForm]);
+
+  const runApprove = useCallback(async () => {
+    console.log("runApprove", window.ethereum);
+    const eth = typeof window !== "undefined" ? window.ethereum : undefined;
+    if (!eth?.request) {
+      setResults((prev) => ({
+        ...prev,
+        [APPROVE_TEST_ID]:
+          "No provider: window.ethereum.request is missing (load dappsdk in wallet iframe).",
+      }));
+      return;
+    }
+
+    setLoading(APPROVE_TEST_ID);
+    try {
+      const accounts = (await eth.request({
+        method: "eth_accounts",
+      })) as string[];
+      const existingAccounts = Array.isArray(accounts) ? accounts : [];
+      const resolvedAccounts =
+        existingAccounts.length > 0
+          ? existingAccounts
+          : ((await eth.request({
+              method: "eth_requestAccounts",
+            })) as string[]);
+      const account = Array.isArray(resolvedAccounts)
+        ? resolvedAccounts[0] ?? ZERO
+        : ZERO;
+      const built = buildApproveTransaction(account, approveForm);
+      if ("error" in built) {
+        throw new Error(built.error);
+      }
+
+      setApprovePreview({
+        json: JSON.stringify([built.tx], null, 2),
+        hint: `eth_accounts[0]: ${account}`,
+      });
+
+      const result = await eth.request({
+        method: "eth_sendTransaction",
+        params: [built.tx],
+      });
+
+      setResults((prev) => ({
+        ...prev,
+        [APPROVE_TEST_ID]:
+          typeof result === "string"
+            ? result
+            : JSON.stringify(result, null, 2),
+      }));
+    } catch (e) {
+      setResults((prev) => ({
+        ...prev,
+        [APPROVE_TEST_ID]: `Error: ${formatError(e)}`,
+      }));
+    } finally {
+      setLoading(null);
+    }
+  }, [approveForm]);
+
   return (
     <div className="bg-white rounded-2xl p-6 shadow-card overflow-x-auto">
       <div className="text-sm font-semibold text-gray-700 mb-1">
@@ -543,6 +732,102 @@ export function DappsdkTestcase() {
         <code className="text-gray-700">request</code>。带「预览注入后」的用例会先读{" "}
         <code className="text-gray-700">eth_accounts</code> 再生成下方 JSON；Run 时使用相同逻辑。
       </p>
+
+      <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+        <div className="text-sm font-semibold text-emerald-900">
+          ERC20 approve 模拟
+        </div>
+        <p className="mt-1 text-xs text-emerald-800">
+          可用真实的 token 合约、swap spender、授权数量来模拟 swap 前的 approve。
+          点击 Run 后会发送一笔 <code>eth_sendTransaction</code>，data 为{" "}
+          <code>approve(address,uint256)</code>。
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <label className="block text-xs font-semibold text-gray-700">
+            Token 合约地址
+            <input
+              aria-label="Token 合约地址"
+              type="text"
+              value={approveForm.tokenAddress}
+              onChange={(event) =>
+                updateApproveForm("tokenAddress", event.target.value)
+              }
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-xs text-gray-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          </label>
+          <label className="block text-xs font-semibold text-gray-700">
+            Spender 地址
+            <input
+              aria-label="Spender 地址"
+              type="text"
+              value={approveForm.spenderAddress}
+              onChange={(event) =>
+                updateApproveForm("spenderAddress", event.target.value)
+              }
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-xs text-gray-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          </label>
+          <label className="block text-xs font-semibold text-gray-700">
+            Approve 数量
+            <input
+              aria-label="Approve 数量"
+              type="text"
+              value={approveForm.amount}
+              onChange={(event) => updateApproveForm("amount", event.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-xs text-gray-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          </label>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center justify-center border-2 border-emerald-600 text-emerald-700 text-xs py-1.5 px-3 rounded-lg font-semibold transition-all hover:bg-emerald-100 disabled:opacity-50"
+            disabled={previewLoadingId === APPROVE_TEST_ID || loading === APPROVE_TEST_ID}
+            onClick={() => void previewApprove()}
+          >
+            {previewLoadingId === APPROVE_TEST_ID ? "…" : "预览 approve"}
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center bg-emerald-600 text-white text-xs py-1.5 px-3 rounded-lg font-semibold transition-all hover:opacity-95 disabled:opacity-50"
+            disabled={loading === APPROVE_TEST_ID}
+            onClick={() => void runApprove()}
+          >
+            {loading === APPROVE_TEST_ID ? "…" : "Run approve"}
+          </button>
+        </div>
+        <div className="mt-3 grid gap-3 lg:grid-cols-[1.3fr_1fr]">
+          <div>
+            <div className="text-[10px] font-semibold text-emerald-700 mb-1">
+              发送参数
+            </div>
+            {approvePreview ? (
+              <>
+                <p className="text-[10px] text-gray-600 mb-1 break-all">
+                  {approvePreview.hint}
+                </p>
+                {approvePreview.json ? (
+                  <pre className="font-mono text-xs text-gray-900 bg-white rounded-lg p-2 whitespace-pre-wrap break-all max-h-56 overflow-y-auto">
+                    {approvePreview.json}
+                  </pre>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-[10px] text-amber-800">
+                填入真实 token / spender / amount 后点击「预览 approve」。
+              </p>
+            )}
+          </div>
+          <div>
+            <div className="text-[10px] font-semibold text-emerald-700 mb-1">
+              approve 结果
+            </div>
+            <pre className="font-mono text-xs text-gray-800 bg-white rounded-lg p-2 min-h-[5rem] max-h-56 overflow-y-auto whitespace-pre-wrap break-all">
+              {results[APPROVE_TEST_ID] ?? "—"}
+            </pre>
+          </div>
+        </div>
+      </div>
 
       <table className="w-full text-sm border-collapse min-w-[680px]">
         <thead>
