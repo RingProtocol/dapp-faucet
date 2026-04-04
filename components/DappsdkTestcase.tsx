@@ -436,6 +436,72 @@ function formatError(err: unknown): string {
   return String(err);
 }
 
+function buildProviderFingerprint() {
+  const eth =
+    typeof window !== "undefined" ? (window.ethereum as DAppEip1193Provider | undefined) : undefined;
+  const ringWallet =
+    typeof window !== "undefined"
+      ? (window as Window & { ringWallet?: { provider?: DAppEip1193Provider; version?: string } })
+          .ringWallet
+      : undefined;
+
+  return {
+    href: typeof window !== "undefined" ? window.location.href : "",
+    isIframe:
+      typeof window !== "undefined" ? window.self !== window.top : false,
+    ethereumExists: !!eth,
+    sameAsRingWalletProvider: !!eth && eth === ringWallet?.provider,
+    ethereumFlags: eth
+      ? {
+          isMetaMask: Boolean((eth as { isMetaMask?: boolean }).isMetaMask),
+          isRingWallet: Boolean((eth as { isRingWallet?: boolean }).isRingWallet),
+          selectedAddress:
+            typeof (eth as { selectedAddress?: unknown }).selectedAddress === "string"
+              ? ((eth as { selectedAddress?: string }).selectedAddress ?? null)
+              : null,
+          chainId:
+            typeof (eth as { chainId?: unknown }).chainId === "string"
+              ? ((eth as { chainId?: string }).chainId ?? null)
+              : null,
+        }
+      : null,
+    ringWalletVersion: ringWallet?.version ?? null,
+    providers:
+      eth && Array.isArray((eth as { providers?: unknown[] }).providers)
+        ? ((eth as { providers?: unknown[] }).providers ?? []).map((provider, index) => {
+            const current = provider as {
+              isMetaMask?: boolean;
+              isRingWallet?: boolean;
+              selectedAddress?: string;
+              chainId?: string;
+            };
+            return {
+              index,
+              isMetaMask: Boolean(current?.isMetaMask),
+              isRingWallet: Boolean(current?.isRingWallet),
+              selectedAddress: current?.selectedAddress ?? null,
+              chainId: current?.chainId ?? null,
+              sameAsWindowEthereum: provider === eth,
+              sameAsRingWalletProvider: provider === ringWallet?.provider,
+            };
+          })
+        : [],
+  };
+}
+
+function logProviderFingerprint(label: string) {
+  console.group(`[DappsdkTestcase] ${label}`);
+  console.log(buildProviderFingerprint());
+  console.log("window.ethereum", typeof window !== "undefined" ? window.ethereum : undefined);
+  console.log(
+    "window.ringWallet",
+    typeof window !== "undefined"
+      ? (window as Window & { ringWallet?: unknown }).ringWallet
+      : undefined
+  );
+  console.groupEnd();
+}
+
 function isAddress(value: string): boolean {
   return /^0x[a-fA-F0-9]{40}$/.test(value.trim());
 }
@@ -664,7 +730,7 @@ export function DappsdkTestcase() {
   }, [approveForm]);
 
   const runApprove = useCallback(async () => {
-    console.log("runApprove", window.ethereum);
+    logProviderFingerprint("runApprove:before-request");
     const eth = typeof window !== "undefined" ? window.ethereum : undefined;
     if (!eth?.request) {
       setResults((prev) => ({
