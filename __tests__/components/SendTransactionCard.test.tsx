@@ -1,7 +1,12 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ChainFaucetPicker } from "@/components/ChainFaucetPicker";
 
 describe("ChainFaucetPicker", () => {
+  afterEach(() => {
+    delete window.ethereum;
+    jest.clearAllMocks();
+  });
+
   it("renders empty state when chains is empty", () => {
     render(<ChainFaucetPicker chains={[]} />);
 
@@ -54,6 +59,36 @@ describe("ChainFaucetPicker", () => {
     const links = screen.getAllByRole("link");
     expect(links).toHaveLength(1);
     expect((links[0] as HTMLAnchorElement).href).toBe("https://b.example/faucet");
+  });
+
+  it("defaults to Ethereum Sepolia even if wallet is currently on another chain", async () => {
+    window.ethereum = {
+      request: jest.fn().mockImplementation(({ method }: { method: string }) => {
+        if (method === "eth_accounts") return Promise.resolve([]);
+        if (method === "eth_chainId") return Promise.resolve("0x95b8");
+        return Promise.resolve(null);
+      }),
+      on: jest.fn(),
+      removeListener: jest.fn(),
+    };
+
+    render(
+      <ChainFaucetPicker
+        chains={[
+          { chainId: 42424, name: "Privix Chain Testnet", faucets: ["https://privix.example"] },
+          { chainId: 11155111, name: "Sepolia", faucets: ["https://sepolia.example"] },
+        ]}
+      />
+    );
+
+    await waitFor(() => {
+      const select = screen.getByRole("combobox");
+      expect((select as HTMLSelectElement).value).toBe("11155111");
+
+      const links = screen.getAllByRole("link");
+      expect(links).toHaveLength(1);
+      expect((links[0] as HTMLAnchorElement).href).toBe("https://sepolia.example/");
+    });
   });
 
   it("filters the chain list by search query", () => {

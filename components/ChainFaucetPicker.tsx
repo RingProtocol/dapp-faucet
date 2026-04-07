@@ -1,12 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 
 export type ChainFaucetInfo = {
   chainId: number;
   name: string;
   faucets: string[];
 };
+
+const DEFAULT_CHAIN_ID = 11155111;
+
+function getDefaultSelectedChainId(chains: ChainFaucetInfo[]): number {
+  return (
+    chains.find((chain) => chain.chainId === DEFAULT_CHAIN_ID)?.chainId ??
+    chains.slice().sort((a, b) => a.name.localeCompare(b.name))[0]?.chainId ??
+    0
+  );
+}
 
 function parseFirstEthAccount(value: unknown): string | null {
   if (!Array.isArray(value)) return null;
@@ -36,10 +46,8 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   const [selectedChainId, setSelectedChainId] = useState<number>(
-    options[0]?.chainId ?? 0
+    getDefaultSelectedChainId(chains)
   );
-
-  const didAutoSelectFromProvider = useRef(false);
 
   useEffect(() => {
     const provider = typeof window !== "undefined" ? window.ethereum : undefined;
@@ -76,10 +84,9 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
 
   useEffect(() => {
     if (chains.length === 0) return;
-    if (selectedChainId !== 0) return;
-    if (!options[0]?.chainId) return;
-    setSelectedChainId(options[0].chainId);
-  }, [chains.length, options, selectedChainId]);
+    if (options.some((option) => option.chainId === selectedChainId)) return;
+    setSelectedChainId(getDefaultSelectedChainId(chains));
+  }, [chains, options, selectedChainId]);
 
   useEffect(() => {
     if (chains.length === 0) return;
@@ -105,19 +112,6 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
       if (!options.some((o) => o.chainId === chainId)) return;
       setSelectedChainId(chainId);
     };
-
-    const init = async () => {
-      if (didAutoSelectFromProvider.current) return;
-      try {
-        const chainIdValue = await provider.request({ method: "eth_chainId" });
-        const chainId = parseChainId(chainIdValue);
-        if (chainId === null) return;
-        applyChainIdIfSupported(chainId);
-        didAutoSelectFromProvider.current = true;
-      } catch {}
-    };
-
-    void init();
 
     const handleChainChanged = (chainIdValue: unknown) => {
       const chainId = parseChainId(chainIdValue);
@@ -164,7 +158,7 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
     return selectedOption ? [selectedOption, ...filtered] : filtered;
   }, [options, searchQuery, selectedChainId]);
 
-  const faucets = selected?.faucets ?? [];
+  const faucets = useMemo(() => selected?.faucets ?? [], [selected]);
   const resolvedFaucetUrls = useMemo(() => {
     return faucets.map((url) =>
       walletAddress ? url.replace(/\$\{ADDRESS\}/g, encodeURIComponent(walletAddress)) : url
