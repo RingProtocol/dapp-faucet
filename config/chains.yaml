@@ -52217,7 +52217,9 @@
   chain: TRON
   rpc:
   - https://api.shasta.trongrid.io/jsonrpc
-  faucets: []
+  faucets:
+  - https://www.trongrid.io/shasta/#faucet
+  - https://shasta.tronscan.org/#/faucet
   nativeCurrency:
     name: Tron
     symbol: TRX
@@ -52293,7 +52295,9 @@
   chain: TRON
   rpc:
   - https://nile.trongrid.io/jsonrpc
-  faucets: []
+  faucets:
+  - https://www.trongrid.io/nile/#faucet
+  - https://nile.tronscan.org/#/faucet
   nativeCurrency:
     name: Tron
     symbol: TRX
