@@ -28895,6 +28895,7 @@
   rpc:
   - https://api.testnet.abs.xyz
   faucets:
+  - https://www.alchemy.com/faucets/ethereum-sepolia
   - https://faucet.triangleplatform.com/abstract/testnet
   chainId: 11124
   networkId: 11124
