@@ -91,7 +91,7 @@ describe("ChainFaucetPicker", () => {
     });
   });
 
-  it("filters the chain list by search query", () => {
+  it("filters the chain list by search query", async () => {
     render(
       <ChainFaucetPicker
         chains={[
@@ -108,13 +108,17 @@ describe("ChainFaucetPicker", () => {
     expect(select.querySelectorAll("option").length).toBe(3);
 
     fireEvent.change(input, { target: { value: "Z" } });
-    expect(select.querySelectorAll("option").length).toBe(2);
-    expect(select.options[0]?.textContent).toContain("A Chain");
-    expect(select.options[1]?.textContent).toContain("Z Chain");
+    await waitFor(() => {
+      expect(select.querySelectorAll("option").length).toBe(1);
+      expect(select.value).toBe("10");
+    });
+    expect(select.options[0]?.textContent).toContain("Z Chain");
 
     fireEvent.change(input, { target: { value: "10" } });
-    expect(select.querySelectorAll("option").length).toBe(2);
-    expect(select.options[0]?.textContent).toContain("A Chain");
-    expect(select.options[1]?.textContent).toContain("Z Chain");
+    await waitFor(() => {
+      expect(select.querySelectorAll("option").length).toBe(1);
+      expect(select.value).toBe("10");
+    });
+    expect(select.options[0]?.textContent).toContain("Z Chain");
   });
 });

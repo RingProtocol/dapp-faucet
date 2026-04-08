@@ -143,13 +143,16 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
   const displayedOptions = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return options;
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, searchQuery]);
 
-    const filtered = options.filter((o) => o.label.toLowerCase().includes(q));
-    if (filtered.some((o) => o.chainId === selectedChainId)) return filtered;
-
-    const selectedOption = options.find((o) => o.chainId === selectedChainId);
-    return selectedOption ? [selectedOption, ...filtered] : filtered;
-  }, [options, searchQuery, selectedChainId]);
+  // When the filter excludes the current selection, move selection to the first visible chain
+  // so the <select> shows a Hyper* chain after typing "hyper", not the previous Sepolia default.
+  useEffect(() => {
+    if (displayedOptions.length === 0) return;
+    if (displayedOptions.some((o) => o.chainId === selectedChainId)) return;
+    setSelectedChainId(displayedOptions[0].chainId);
+  }, [displayedOptions, selectedChainId]);
 
   const faucets = useMemo(() => selected?.faucets ?? [], [selected]);
   const resolvedFaucetUrls = useMemo(() => {
@@ -173,27 +176,37 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
             <label className="text-sm font-semibold text-gray-700">
               Choose chain
             </label>
-            <input
-              className="w-full p-3 border-2 border-gray-200 rounded-lg text-sm font-sans focus:outline-none focus:border-primary"
-              value={searchQuery}
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                setSearchQuery(e.target.value)
-              }
-              placeholder="Search chains..."
-            />
-            <select
-              className="w-full p-3 border-2 border-gray-200 rounded-lg text-sm font-sans focus:outline-none focus:border-primary"
-              value={selectedChainId}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                setSelectedChainId(parseInt(e.target.value, 10))
-              }
-            >
-              {displayedOptions.map((o) => (
-                <option key={o.chainId} value={o.chainId}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            <div className="rounded-lg border-2 border-gray-200 overflow-hidden transition-colors focus-within:border-primary">
+              <input
+                type="search"
+                aria-label="Filter chains"
+                className="w-full px-3 py-2.5 text-sm font-sans border-0 border-b-2 border-gray-200 bg-white placeholder:text-gray-400 focus:outline-none focus:bg-gray-50/80"
+                value={searchQuery}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setSearchQuery(e.target.value)
+                }
+                placeholder="Search chains..."
+              />
+              {displayedOptions.length === 0 && searchQuery.trim() ? (
+                <div className="px-3 py-2.5 text-sm text-gray-500 bg-gray-50/80">
+                  No chains match this filter.
+                </div>
+              ) : (
+                <select
+                  className="w-full p-3 border-0 rounded-none text-sm font-sans bg-white focus:outline-none focus:ring-0"
+                  value={selectedChainId}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                    setSelectedChainId(parseInt(e.target.value, 10))
+                  }
+                >
+                  {displayedOptions.map((o) => (
+                    <option key={o.chainId} value={o.chainId}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
 
           <div className="mt-5">
