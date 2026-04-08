@@ -189,6 +189,50 @@
   - name: Mempool
     url: https://mempool.space
     standard: none
+- name: Bitcoin Testnet3
+  index: 6.1
+  title: Bitcoin Testnet3 (non-EVM)
+  chain: BTC
+  rpc:
+  - https://mempool.space/testnet/api
+  - https://blockstream.info/testnet/api
+  features: []
+  faucets:
+  - https://mempool.space/testnet/faucet
+  nativeCurrency:
+    name: Bitcoin
+    symbol: BTC
+    decimals: 8
+  infoURL: https://bitcoin.org
+  shortName: btc-testnet3
+  chainId: 888888803
+  networkId: 888888803
+  explorers:
+  - name: Mempool (testnet)
+    url: https://mempool.space/testnet
+    standard: none
+- name: Bitcoin Testnet4
+  index: 6.2
+  title: Bitcoin Testnet4 (non-EVM)
+  chain: BTC
+  rpc:
+  - https://mempool.space/testnet4/api
+  - https://blockstream.info/testnet/api
+  features: []
+  faucets:
+  - https://mempool.space/testnet4/faucet
+  nativeCurrency:
+    name: Bitcoin
+    symbol: BTC
+    decimals: 8
+  infoURL: https://bitcoin.org
+  shortName: btc-testnet4
+  chainId: 888888804
+  networkId: 888888804
+  explorers:
+  - name: Mempool (testnet4)
+    url: https://mempool.space/testnet4
+    standard: none
 - name: Arbitrum One
   index: 7
   chainId: 42161
