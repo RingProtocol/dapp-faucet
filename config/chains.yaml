@@ -73,6 +73,48 @@
   - name: Solscan
     url: https://solscan.io
     standard: none
+- name: Solana Devnet
+  index: 2.1
+  title: Solana Devnet
+  chain: SOL
+  rpc:
+  - https://api.devnet.solana.com
+  features: []
+  faucets:
+  - https://faucet.solana.com
+  nativeCurrency:
+    name: Solana
+    symbol: SOL
+    decimals: 9
+  infoURL: https://solana.com
+  shortName: sol-devnet
+  chainId: 888888805
+  networkId: 888888805
+  explorers:
+  - name: Solscan (devnet)
+    url: https://solscan.io/?cluster=devnet
+    standard: none
+- name: Solana Testnet
+  index: 2.2
+  title: Solana Testnet
+  chain: SOL
+  rpc:
+  - https://api.testnet.solana.com
+  features: []
+  faucets:
+  - https://faucet.solana.com
+  nativeCurrency:
+    name: Solana
+    symbol: SOL
+    decimals: 9
+  infoURL: https://solana.com
+  shortName: sol-testnet
+  chainId: 888888806
+  networkId: 888888806
+  explorers:
+  - name: Solscan (testnet)
+    url: https://solscan.io/?cluster=testnet
+    standard: none
 - name: BNB Smart Chain Mainnet
   index: 3
   chain: BSC
