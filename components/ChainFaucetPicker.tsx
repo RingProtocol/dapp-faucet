@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 
 export type ChainFaucetInfo = {
   chainId: number;
@@ -19,6 +19,7 @@ function getDefaultSelectedChainId(chains: ChainFaucetInfo[]): number {
 }
 
 function parseFirstEthAccount(value: unknown): string | null {
+  console.log("parseFirstEthAccount:value=", value)
   if (!Array.isArray(value)) return null;
   const first = value[0];
   if (typeof first !== "string") return null;
@@ -28,10 +29,6 @@ function parseFirstEthAccount(value: unknown): string | null {
 
 export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [walletStatus, setWalletStatus] = useState<
-    "loading" | "no_provider" | "disconnected" | "connected"
-  >("loading");
-  const [connectBusy, setConnectBusy] = useState(false);
 
   const options = useMemo(() => {
     return chains
@@ -52,20 +49,29 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
   useEffect(() => {
     const provider = typeof window !== "undefined" ? window.ethereum : undefined;
     if (!provider?.request) {
+      console.log("provider==null.")
       setWalletAddress(null);
-      setWalletStatus("no_provider");
       return;
     }
+
+    const handleMessage = (event: MessageEvent) => {
+      console.log("handleMsg: event=", event)
+      const data = event.data;
+      if (data && typeof data === "object" && data.type === "ring_wallet_handshake_ack") {
+        const address = parseFirstEthAccount(data.accounts);
+        setWalletAddress(address);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
 
     const refresh = async () => {
       try {
         const accounts = await provider.request({ method: "eth_accounts" });
         const address = parseFirstEthAccount(accounts);
         setWalletAddress(address);
-        setWalletStatus(address ? "connected" : "disconnected");
       } catch {
         setWalletAddress(null);
-        setWalletStatus("disconnected");
       }
     };
 
@@ -74,12 +80,19 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
     const handleAccountsChanged = (accounts: unknown) => {
       const address = parseFirstEthAccount(accounts);
       setWalletAddress(address);
-      setWalletStatus(address ? "connected" : "disconnected");
     };
 
     provider.on?.("accountsChanged", handleAccountsChanged);
-    return () =>
+    provider.on?.("chainChanged", handleAccountsChanged);
+
+    console.log("provider=", provider);
+    console.log("provider.on", provider.on);
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
       provider.removeListener?.("accountsChanged", handleAccountsChanged);
+      provider.removeListener?.("chainChanged", handleAccountsChanged);
+    };
   }, []);
 
   useEffect(() => {
@@ -122,26 +135,6 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
     provider.on?.("chainChanged", handleChainChanged);
     return () => provider.removeListener?.("chainChanged", handleChainChanged);
   }, [chains.length, options]);
-
-  const handleConnectWallet = useCallback(async () => {
-    const provider = typeof window !== "undefined" ? window.ethereum : undefined;
-    if (!provider?.request) return;
-
-    setConnectBusy(true);
-    try {
-      const accounts = await provider.request({
-        method: "eth_requestAccounts",
-      });
-      const address = parseFirstEthAccount(accounts);
-      setWalletAddress(address);
-      setWalletStatus(address ? "connected" : "disconnected");
-    } catch {
-      setWalletAddress(null);
-      setWalletStatus("disconnected");
-    } finally {
-      setConnectBusy(false);
-    }
-  }, []);
 
   const selected = useMemo(() => {
     return chains.find((c) => c.chainId === selectedChainId) || null;
@@ -201,32 +194,6 @@ export function ChainFaucetPicker({ chains }: { chains: ChainFaucetInfo[] }) {
                 </option>
               ))}
             </select>
-            <div className="text-xs text-gray-600">
-              <span className="font-semibold text-gray-700">已连接地址：</span>
-              {walletStatus === "loading" ? (
-                <span className="text-gray-500">读取中…</span>
-              ) : walletStatus === "no_provider" ? (
-                <span className="text-gray-500">未检测到钱包</span>
-              ) : walletAddress ? (
-                <span className="font-mono text-gray-900 break-all">
-                  {walletAddress}
-                </span>
-              ) : (
-                <span className="inline-flex flex-wrap items-center gap-2">
-                  <span className="text-gray-500">
-                    未连接（eth_accounts 为空）
-                  </span>
-                  <button
-                    type="button"
-                    disabled={connectBusy}
-                    onClick={() => void handleConnectWallet()}
-                    className="shrink-0 rounded-lg border-2 border-primary bg-primary px-3 py-1 text-xs font-semibold text-white transition-all hover:opacity-95 disabled:opacity-50"
-                  >
-                    {connectBusy ? "连接中…" : "连接钱包"}
-                  </button>
-                </span>
-              )}
-            </div>
           </div>
 
           <div className="mt-5">
