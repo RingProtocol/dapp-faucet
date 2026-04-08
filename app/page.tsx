@@ -43,7 +43,9 @@ function parseChainsYamlForFaucets(yaml: string): ChainFaucetInfo[] {
     const line = raw.trimEnd();
     if (!line || line.trim() === "---") continue;
 
-    const isNewItem = /^\s*-\s+name:\s*(.+)$/.exec(line.trim());
+    // Only top-level list items (column 0: `- name:`) are chains; nested `- name:` under
+    // `features:`, `explorers:`, etc. must not start a new chain (e.g. EIP155).
+    const isNewItem = /^-\s+name:\s*(.+)$/.exec(line);
     if (isNewItem) {
       pushCurrent();
       current = { name: isNewItem[1].trim(), faucets: [] };
@@ -109,7 +111,7 @@ export default async function Home() {
           Faucet Launcher
         </h1>
         <p className="text-white/80 text-center mb-8">
-          Choose a chain in the iframe / RingWallet and open its faucet
+          Choose a chain and open its faucet
         </p>
 
         <FaucetLauncherShell chains={chains} />
