@@ -33,6 +33,7 @@ export function FaucetLauncherShell({ chains }: { chains: ChainFaucetInfo[] }) {
   const [view, setView] = useState<View>("faucet");
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
   const [walletStatus, setWalletStatus] = useState<
     "loading" | "no_provider" | "disconnected" | "connected"
   >("loading");
@@ -128,6 +129,34 @@ export function FaucetLauncherShell({ chains }: { chains: ChainFaucetInfo[] }) {
     return matched ? `${matched.name} (${chainId})` : `${chainId}`;
   }, [chainId, chainStatus, chains]);
 
+  useEffect(() => {
+    if (!copied) return;
+    const t = window.setTimeout(() => setCopied(false), 900);
+    return () => window.clearTimeout(t);
+  }, [copied]);
+
+  const handleCopyAddress = useCallback(async () => {
+    if (!walletAddress) return;
+    try {
+      await navigator.clipboard.writeText(walletAddress);
+      setCopied(true);
+      return;
+    } catch {}
+
+    try {
+      const el = document.createElement("textarea");
+      el.value = walletAddress;
+      el.setAttribute("readonly", "true");
+      el.style.position = "fixed";
+      el.style.opacity = "0";
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      setCopied(true);
+    } catch {}
+  }, [walletAddress]);
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-white/20 bg-white/10 p-4 text-white shadow-card backdrop-blur-sm">
@@ -148,13 +177,29 @@ export function FaucetLauncherShell({ chains }: { chains: ChainFaucetInfo[] }) {
               <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">
                 Selected wallet
               </div>
-              <div className="mt-1 text-sm font-semibold break-all">
-                {walletStatus === "loading"
-                  ? "Loading…"
-                  : walletStatus === "no_provider"
-                    ? "No wallet detected"
-                    : walletAddress ?? "Disconnected"}
-              </div>
+              {walletStatus === "connected" && walletAddress ? (
+                <button
+                  type="button"
+                  onClick={() => void handleCopyAddress()}
+                  className="mt-1 w-full text-left text-sm font-semibold break-all rounded-lg px-1.5 py-1 transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                  title="Click to copy address"
+                >
+                  {walletAddress}
+                  {copied ? (
+                    <span className="ml-2 text-[11px] font-semibold text-white/70">
+                      Copied
+                    </span>
+                  ) : null}
+                </button>
+              ) : (
+                <div className="mt-1 text-sm font-semibold break-all">
+                  {walletStatus === "loading"
+                    ? "Loading…"
+                    : walletStatus === "no_provider"
+                      ? "No wallet detected"
+                      : "Disconnected"}
+                </div>
+              )}
               <div className="mt-1 text-xs text-white/70">
                 Address is controlled by the wallet account currently selected in Ring Wallet.
               </div>

@@ -48802,7 +48802,7 @@
   - wss://sepolia.drpc.org
   - https://eth-sepolia.g.alchemy.com/v2/WddzdzI2o9S3COdT73d5w6AIogbKq4X-
   faucets:
-  - https://cloud.google.com/application/web3/faucet/ethereum/sepolia?address=${ADDRESS}
+  - https://cloud.google.com/application/web3/faucet/ethereum/sepolia
   nativeCurrency:
     name: Sepolia Ether
     symbol: ETH
